@@ -1,18 +1,39 @@
 services:
-  # Base de datos MySQL
-  mysql-db:
+  # Base de datos MySQL para Auth Service
+  mysql-auth-db:
     image: mysql:8.0
-    container_name: vetcore_mysql
+    container_name: vetcore_mysql_auth
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: vetcore_db
-      MYSQL_USER: vetcore_user
+      MYSQL_DATABASE: vetcore_auth_db
+      MYSQL_USER: vetcore_auth_user
       MYSQL_PASSWORD: vetcore_pass
     ports:
-      - "3306:3306"
+      - "3308:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_auth_data:/var/lib/mysql
+    networks:
+      - vetcore-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Base de datos MySQL para Patients Service
+  mysql-patients-db:
+    image: mysql:8.0
+    container_name: vetcore_mysql_patients
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: vetcore_patients_db
+      MYSQL_USER: vetcore_patients_user
+      MYSQL_PASSWORD: vetcore_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_patients_data:/var/lib/mysql
     networks:
       - vetcore-network
     healthcheck:
@@ -29,17 +50,17 @@ services:
     restart: always
     environment:
       PORT: 3000
-      DB_HOST: mysql-db
+      DB_HOST: mysql-auth-db
       DB_PORT: 3306
-      DB_NAME: vetcore_db
-      DB_USER: vetcore_user
+      DB_NAME: vetcore_auth_db
+      DB_USER: vetcore_auth_user
       DB_PASSWORD: vetcore_pass
       JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
       JWT_EXPIRES_IN: 24h
     ports:
       - "3000:3000"
     depends_on:
-      mysql-db:
+      mysql-auth-db:
         condition: service_healthy
     networks:
       - vetcore-network
@@ -58,6 +79,44 @@ services:
       retries: 3
       start_period: 40s
 
+  # Servicio de Pacientes
+  patients-service:
+    build:
+      context: ../vetcore_patients_msvc
+      dockerfile: Dockerfile
+    container_name: vetcore_patients_service
+    restart: always
+    environment:
+      PORT: 3001
+      DB_HOST: mysql-patients-db
+      DB_PORT: 3306
+      DB_NAME: vetcore_patients_db
+      DB_USER: vetcore_patients_user
+      DB_PASSWORD: vetcore_pass
+      JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
+      JWT_EXPIRES_IN: 24h
+    ports:
+      - "3001:3001"
+    depends_on:
+      mysql-patients-db:
+        condition: service_healthy
+    networks:
+      - vetcore-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3001/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # API Gateway
   api-gateway:
     build:
@@ -68,12 +127,14 @@ services:
     environment:
       PORT: 8000
       AUTH_SERVICE_URL: http://auth-service:3000
+      PATIENTS_SERVICE_URL: http://patients-service:3001
       CORS_ORIGIN: "*"
       NODE_ENV: production
     ports:
       - "8000:8000"
     depends_on:
       - auth-service
+      - patients-service
     networks:
       - vetcore-network
     healthcheck:
@@ -95,5 +156,7 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data:
+  mysql_auth_data:
+    driver: local
+  mysql_patients_data:
     driver: local
