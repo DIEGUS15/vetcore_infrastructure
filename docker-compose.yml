@@ -43,9 +43,7 @@ services:
 
   # Servicio de Autenticación
   auth-service:
-    build:
-      context: ../vetcore_auth_msvc
-      dockerfile: Dockerfile
+    image: vetcore/auth-service:latest
     container_name: vetcore_auth_service
     restart: always
     environment:
@@ -81,9 +79,7 @@ services:
 
   # Servicio de Pacientes
   patients-service:
-    build:
-      context: ../vetcore_patients_msvc
-      dockerfile: Dockerfile
+    image: vetcore/patients-service:latest
     container_name: vetcore_patients_service
     restart: always
     environment:
@@ -119,9 +115,7 @@ services:
 
   # API Gateway
   api-gateway:
-    build:
-      context: ../vetcore_apigateway_msvc
-      dockerfile: Dockerfile
+    image: vetcore/api-gateway:latest
     container_name: vetcore_api_gateway
     restart: always
     environment:
