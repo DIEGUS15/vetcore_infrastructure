@@ -61,6 +61,27 @@ services:
       timeout: 20s
       retries: 10
 
+  # Base de datos MySQL para Appointments Service
+  mysql-appointments-db:
+    image: mysql:8.0
+    container_name: vetcore_mysql_appointments
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: vetcore_appointments_db
+      MYSQL_USER: vetcore_appointments_user
+      MYSQL_PASSWORD: vetcore_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_appointments_data:/var/lib/mysql
+    networks:
+      - vetcore-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
   # Servicio de Autenticación
   auth-service:
     image: vetcore/auth-service:latest
@@ -136,6 +157,44 @@ services:
       retries: 3
       start_period: 40s
 
+  # Servicio de Citas
+  appointments-service:
+    image: vetcore/appointments-service:latest
+    container_name: vetcore_appointments_service
+    restart: always
+    environment:
+      PORT: 3003
+      DB_HOST: mysql-appointments-db
+      DB_PORT: 3306
+      DB_NAME: vetcore_appointments_db
+      DB_USER: vetcore_appointments_user
+      DB_PASSWORD: vetcore_pass
+      JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
+      JWT_EXPIRES_IN: 24h
+      AUTH_SERVICE_URL: http://auth-service:3000
+      PATIENTS_SERVICE_URL: http://patients-service:3001
+    ports:
+      - "3003:3003"
+    depends_on:
+      mysql-appointments-db:
+        condition: service_healthy
+    networks:
+      - vetcore-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3003/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # API Gateway
   api-gateway:
     image: vetcore/api-gateway:latest
@@ -145,6 +204,7 @@ services:
       PORT: 8000
       AUTH_SERVICE_URL: http://auth-service:3000
       PATIENTS_SERVICE_URL: http://patients-service:3001
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3003
       CORS_ORIGIN: "*"
       NODE_ENV: production
     ports:
@@ -152,6 +212,7 @@ services:
     depends_on:
       - auth-service
       - patients-service
+      - appointments-service
     networks:
       - vetcore-network
     healthcheck:
@@ -214,6 +275,8 @@ volumes:
   mysql_auth_data:
     driver: local
   mysql_patients_data:
+    driver: local
+  mysql_appointments_data:
     driver: local
   rabbitmq_data:
     driver: local
