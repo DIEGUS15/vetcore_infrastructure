@@ -173,10 +173,13 @@ services:
       JWT_EXPIRES_IN: 24h
       AUTH_SERVICE_URL: http://auth-service:3000
       PATIENTS_SERVICE_URL: http://patients-service:3001
+      RABBITMQ_URL: amqp://vetcore:vetcore_pass@rabbitmq:5672
     ports:
       - "3003:3003"
     depends_on:
       mysql-appointments-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - vetcore-network
