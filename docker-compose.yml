@@ -1,4 +1,24 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: vetcore_rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: vetcore
+      RABBITMQ_DEFAULT_PASS: vetcore_pass
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - vetcore-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   # Base de datos MySQL para Auth Service
   mysql-auth-db:
     image: mysql:8.0
@@ -55,10 +75,13 @@ services:
       DB_PASSWORD: vetcore_pass
       JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
       JWT_EXPIRES_IN: 24h
+      RABBITMQ_URL: amqp://vetcore:vetcore_pass@rabbitmq:5672
     ports:
       - "3000:3000"
     depends_on:
       mysql-auth-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - vetcore-network
@@ -145,6 +168,44 @@ services:
       timeout: 10s
       retries: 3
 
+  # Servicio de Notificaciones
+  notifications-service:
+    image: vetcore/notifications-service:latest
+    container_name: vetcore_notifications_service
+    restart: always
+    environment:
+      PORT: 3002
+      NODE_ENV: production
+      RABBITMQ_URL: amqp://vetcore:vetcore_pass@rabbitmq:5672
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: "false"
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      EMAIL_FROM: ${EMAIL_FROM}
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      - "3002:3002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vetcore-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3002/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 networks:
   vetcore-network:
     driver: bridge
@@ -153,4 +214,6 @@ volumes:
   mysql_auth_data:
     driver: local
   mysql_patients_data:
+    driver: local
+  rabbitmq_data:
     driver: local
