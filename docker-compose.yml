@@ -15,9 +15,9 @@ services:
       - vetcore-network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      interval: 5s
+      timeout: 2s
+      retries: 20
 
   # Base de datos MySQL para Auth Service
   mysql-auth-db:
@@ -135,6 +135,7 @@ services:
       DB_PASSWORD: vetcore_pass
       JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
       JWT_EXPIRES_IN: 24h
+      AUTH_SERVICE_URL: http://auth-service:3000
     ports:
       - "3001:3001"
     depends_on:
@@ -208,6 +209,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3000
       PATIENTS_SERVICE_URL: http://patients-service:3001
       APPOINTMENTS_SERVICE_URL: http://appointments-service:3003
+      SCHEDULE_SERVICE_URL: http://schedule-query-msvc:8082
       CORS_ORIGIN: "*"
       NODE_ENV: production
     ports:
@@ -244,9 +246,9 @@ services:
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
       SMTP_SECURE: "false"
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      EMAIL_FROM: ${EMAIL_FROM}
+      SMTP_USER: trixmer.stiven1@gmail.com
+      SMTP_PASS: vqlmmfskwjnkpsqn
+      EMAIL_FROM: trixmer.stiven1@gmail.com
       FRONTEND_URL: http://localhost:5173
     ports:
       - "3002:3002"
@@ -272,7 +274,7 @@ services:
 
   # === PostgreSQL para schedule-query-msvc ===
   postgres-db:
-    image: postgres:15
+    image: postgres:17.5
     container_name: schedule_postgres_dev
     restart: always
     environment:
