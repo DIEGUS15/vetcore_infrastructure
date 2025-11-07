@@ -270,8 +270,58 @@ services:
       retries: 3
       start_period: 40s
 
+  # === PostgreSQL para schedule-query-msvc ===
+  postgres-db:
+    image: postgres:15
+    container_name: schedule_postgres_dev
+    restart: always
+    environment:
+      POSTGRES_DB: vet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vetcore-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vet"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # === schedule-query-msvc ===
+  schedule-query-msvc:
+    build:
+      context: ../ScheduleQueryMSVC/
+      dockerfile: Dockerfile
+    container_name: schedule_query_dev
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      JDBC_DATABASE_URL: jdbc:postgresql://postgres-db:5432/vet
+      JDBC_DATABASE_USERNAME: postgres
+      JDBC_DATABASE_PASSWORD: postgres
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: vetcore
+      RABBITMQ_PASSWORD: vetcore_pass
+      TZ: America/Bogota
+      PORT: 8082
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vetcore-network
+
 networks:
   vetcore-network:
+    driver: bridge
+  schedule-network:
     driver: bridge
 
 volumes:
@@ -282,4 +332,6 @@ volumes:
   mysql_appointments_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  postgres_data:
     driver: local

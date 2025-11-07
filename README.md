@@ -1,1 +1,0 @@
-# vetcore_infrastructure
