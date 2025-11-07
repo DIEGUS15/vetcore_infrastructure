@@ -246,9 +246,9 @@ services:
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
       SMTP_SECURE: "false"
-      SMTP_USER: trixmer.stiven1@gmail.com
-      SMTP_PASS: vqlmmfskwjnkpsqn
-      EMAIL_FROM: trixmer.stiven1@gmail.com
+      SMTP_USER: tu correo
+      SMTP_PASS: tu clave de aplicacion
+      EMAIL_FROM: tu correo
       FRONTEND_URL: http://localhost:5173
     ports:
       - "3002:3002"
