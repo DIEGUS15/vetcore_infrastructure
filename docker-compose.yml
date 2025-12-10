@@ -176,6 +176,8 @@ services:
       RABBITMQ_URL: amqp://vetcore:vetcore_pass@rabbitmq:5672
     ports:
       - "3003:3003"
+    volumes:
+      - medical_files:/app/uploads
     depends_on:
       mysql-appointments-db:
         condition: service_healthy
@@ -282,4 +284,6 @@ volumes:
   mysql_appointments_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  medical_files:
     driver: local
