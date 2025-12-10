@@ -82,6 +82,27 @@ services:
       timeout: 20s
       retries: 10
 
+  # Base de datos MySQL para Staff Service
+  mysql-staff-db:
+    image: mysql:8.0
+    container_name: vetcore_mysql_staff
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: vetcore_staff_db
+      MYSQL_USER: vetcore_staff_user
+      MYSQL_PASSWORD: vetcore_pass
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql_staff_data:/var/lib/mysql
+    networks:
+      - vetcore-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
   # Servicio de Autenticación
   auth-service:
     image: vetcore/auth-service:latest
@@ -135,6 +156,7 @@ services:
       DB_PASSWORD: vetcore_pass
       JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
       JWT_EXPIRES_IN: 24h
+      AUTH_SERVICE_URL: http://auth-service:3000
     ports:
       - "3001:3001"
     depends_on:
@@ -208,6 +230,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3000
       PATIENTS_SERVICE_URL: http://patients-service:3001
       APPOINTMENTS_SERVICE_URL: http://appointments-service:3003
+      STAFF_SERVICE_URL: http://staff-service:3004
       CORS_ORIGIN: "*"
       NODE_ENV: production
     ports:
@@ -232,7 +255,44 @@ services:
       timeout: 10s
       retries: 3
 
-  # Servicio de Notificaciones
+  # Servicio de Personal
+  staff-service:
+    image: vetcore/staff-service:latest
+    container_name: vetcore_staff_service
+    restart: always
+    environment:
+      PORT: 3004
+      DB_HOST: mysql-staff-db
+      DB_PORT: 3306
+      DB_NAME: vetcore_staff_db
+      DB_USER: vetcore_staff_user
+      DB_PASSWORD: vetcore_pass
+      JWT_SECRET: a8225db5b40aaae0e5a1eb0dddacf63b
+      RABBITMQ_URL: amqp://vetcore:vetcore_pass@rabbitmq:5672
+    ports:
+      - "3004:3004"
+    depends_on:
+      mysql-staff-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vetcore-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3004/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   notifications-service:
     image: vetcore/notifications-service:latest
     container_name: vetcore_notifications_service
@@ -270,60 +330,10 @@ services:
       retries: 3
       start_period: 40s
 
-  # === PostgreSQL para schedule-query-msvc ===
-  postgres-db:
-    image: postgres:15
-    container_name: schedule_postgres_dev
-    restart: always
-    environment:
-      POSTGRES_DB: vet
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - vetcore-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d vet"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # === schedule-query-msvc ===
-  schedule-query-msvc:
-    build:
-      context: ../ScheduleQueryMSVC/
-      dockerfile: Dockerfile
-    container_name: schedule_query_dev
-    restart: always
-    ports:
-      - "8082:8082"
-    environment:
-      JDBC_DATABASE_URL: jdbc:postgresql://postgres-db:5432/vet
-      JDBC_DATABASE_USERNAME: postgres
-      JDBC_DATABASE_PASSWORD: postgres
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: vetcore
-      RABBITMQ_PASSWORD: vetcore_pass
-      TZ: America/Bogota
-      PORT: 8082
-    depends_on:
-      postgres-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - vetcore-network
-
 networks:
   vetcore-network:
     driver: bridge
-  schedule-network:
-    driver: bridge
-
+    
 volumes:
   mysql_auth_data:
     driver: local
@@ -331,7 +341,7 @@ volumes:
     driver: local
   mysql_appointments_data:
     driver: local
-  rabbitmq_data:
+  mysql_staff_data:
     driver: local
-  postgres_data:
+  rabbitmq_data:
     driver: local
